@@ -52,48 +52,156 @@ export function generateElderlyFriendlyResponse(message) {
 }
 
 export function speakText(text, voice = null) {
-  if ('speechSynthesis' in window) {
+  console.log('Attempting to speak text:', text)
+  
+  if (!('speechSynthesis' in window)) {
+    console.error('Speech synthesis not supported in this browser')
+    return null
+  }
+  
+  try {
     // Cancel any ongoing speech
     window.speechSynthesis.cancel()
     
     const utterance = new SpeechSynthesisUtterance(text)
     
     // Set elderly-friendly speech settings
-    utterance.rate = 0.9 // Slightly slower
+    utterance.rate = 0.8 // Slower for elderly users
     utterance.pitch = 1.0 // Natural pitch
     utterance.volume = 1.0 // Full volume
     
-    // Try to use a friendly voice if available
+    // Try to use Persian voice if available, otherwise fall back to English
     if (voice) {
       utterance.voice = voice
     } else {
-      const voices = speechSynthesis.getVoices()
-      const friendlyVoice = voices.find(v => 
-        v.name.includes('Samantha') || 
-        v.name.includes('Karen') || 
-        v.name.includes('Alex') ||
-        v.lang.startsWith('en')
+      const voices = window.speechSynthesis.getVoices()
+      console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`))
+      
+      // Try to find Persian voice first
+      let selectedVoice = voices.find(v => 
+        v.lang.startsWith('fa') || 
+        v.lang.startsWith('fa-IR') ||
+        v.name.toLowerCase().includes('persian') ||
+        v.name.toLowerCase().includes('farsi')
       )
-      if (friendlyVoice) {
-        utterance.voice = friendlyVoice
+      
+      // If no Persian voice, try English voices
+      if (!selectedVoice) {
+        selectedVoice = voices.find(v => 
+          v.name.includes('Samantha') || 
+          v.name.includes('Karen') || 
+          v.name.includes('Alex') ||
+          v.name.includes('Google') ||
+          v.lang.startsWith('en')
+        )
+      }
+      
+      // Fall back to default voice
+      if (!selectedVoice && voices.length > 0) {
+        selectedVoice = voices.find(v => v.default) || voices[0]
+      }
+      
+      if (selectedVoice) {
+        utterance.voice = selectedVoice
+        console.log('Selected voice:', selectedVoice.name, selectedVoice.lang)
+      } else {
+        console.warn('No suitable voice found')
       }
     }
     
+    // Add event listeners for debugging
+    utterance.onstart = () => {
+      console.log('Speech started:', text)
+    }
+    
+    utterance.onend = () => {
+      console.log('Speech ended:', text)
+    }
+    
+    utterance.onerror = (event) => {
+      console.error('Speech synthesis error:', event.error, event)
+    }
+    
+    utterance.onpause = () => {
+      console.log('Speech paused')
+    }
+    
+    utterance.onresume = () => {
+      console.log('Speech resumed')
+    }
+    
+    // Set language to Persian if available
+    utterance.lang = 'fa-IR'
+    
     window.speechSynthesis.speak(utterance)
     return utterance
+    
+  } catch (error) {
+    console.error('Error in speakText:', error)
+    return null
   }
-  return null
 }
 
 export function getFriendlyVoice() {
-  if ('speechSynthesis' in window) {
-    const voices = speechSynthesis.getVoices()
-    return voices.find(v => 
+  if (!('speechSynthesis' in window)) {
+    console.error('Speech synthesis not supported')
+    return null
+  }
+  
+  try {
+    const voices = window.speechSynthesis.getVoices()
+    
+    // Wait for voices to load if they're not available yet
+    if (voices.length === 0) {
+      console.log('No voices available, waiting for voices to load...')
+      return new Promise((resolve) => {
+        window.speechSynthesis.onvoiceschanged = () => {
+          const loadedVoices = window.speechSynthesis.getVoices()
+          resolve(findBestVoice(loadedVoices))
+        }
+      })
+    }
+    
+    return findBestVoice(voices)
+    
+  } catch (error) {
+    console.error('Error getting friendly voice:', error)
+    return null
+  }
+}
+
+function findBestVoice(voices) {
+  console.log('Finding best voice from', voices.length, 'available voices')
+  
+  // Try Persian voice first
+  let bestVoice = voices.find(v => 
+    v.lang.startsWith('fa') || 
+    v.lang.startsWith('fa-IR') ||
+    v.name.toLowerCase().includes('persian') ||
+    v.name.toLowerCase().includes('farsi')
+  )
+  
+  // If no Persian voice, try English voices
+  if (!bestVoice) {
+    bestVoice = voices.find(v => 
       v.name.includes('Samantha') || 
       v.name.includes('Karen') || 
       v.name.includes('Alex') ||
-      (v.lang.startsWith('en') && v.default)
-    ) || voices[0]
+      v.name.includes('Google') ||
+      v.lang.startsWith('en')
+    )
   }
-  return null
+  
+  // Fall back to default voice
+  if (!bestVoice && voices.length > 0) {
+    bestVoice = voices.find(v => v.default) || voices[0]
+  }
+  
+  if (bestVoice) {
+    console.log('Best voice found:', bestVoice.name, bestVoice.lang)
+  } else {
+    console.warn('No suitable voice found')
+  }
+  
+  return bestVoice
 } 

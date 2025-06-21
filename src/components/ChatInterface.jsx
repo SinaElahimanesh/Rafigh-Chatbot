@@ -172,8 +172,58 @@ const ChatInterface = () => {
 
   // Handle speak function
   const handleSpeak = (text) => {
-    if (isSpeaking) {
-      speakText(text, getFriendlyVoice())
+    console.log('handleSpeak called with text:', text)
+    
+    if (!text || text.trim() === '') {
+      console.warn('Empty text provided to handleSpeak')
+      return
+    }
+    
+    if (!('speechSynthesis' in window)) {
+      console.error('Speech synthesis not supported in this browser')
+      setError('پخش صدا در مرورگر شما پشتیبانی نمی‌شود')
+      return
+    }
+    
+    try {
+      // Check if speech synthesis is paused or speaking
+      if (window.speechSynthesis.speaking) {
+        console.log('Speech synthesis is already speaking, canceling...')
+        window.speechSynthesis.cancel()
+      }
+      
+      if (window.speechSynthesis.paused) {
+        console.log('Speech synthesis is paused, resuming...')
+        window.speechSynthesis.resume()
+        return
+      }
+      
+      setIsSpeaking(true)
+      console.log('Starting speech synthesis...')
+      
+      const utterance = speakText(text, getFriendlyVoice())
+      
+      if (utterance) {
+        utterance.onend = () => {
+          console.log('Speech ended, setting isSpeaking to false')
+          setIsSpeaking(false)
+        }
+        
+        utterance.onerror = (event) => {
+          console.error('Speech synthesis error in handleSpeak:', event.error)
+          setIsSpeaking(false)
+          setError(`خطا در پخش صدا: ${event.error}`)
+        }
+      } else {
+        console.error('Failed to create utterance')
+        setIsSpeaking(false)
+        setError('خطا در ایجاد صدا')
+      }
+      
+    } catch (error) {
+      console.error('Error in handleSpeak:', error)
+      setIsSpeaking(false)
+      setError('خطا در پخش صدا')
     }
   }
 
@@ -285,6 +335,21 @@ const ChatInterface = () => {
                   >
                     <Volume2 className="h-4 w-4 ml-1" />
                     تست خروجی صدا
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      console.log('Testing voice synthesis...')
+                      const voices = window.speechSynthesis.getVoices()
+                      console.log('Available voices:', voices)
+                      handleSpeak('Hello! This is a test of voice synthesis.')
+                    }}
+                    variant="elderlySecondary"
+                    size="sm"
+                    className="px-4 py-2 text-sm"
+                    aria-label="Test English voice"
+                  >
+                    <Volume2 className="h-4 w-4 ml-1" />
+                    تست انگلیسی
                   </Button>
                   <Button
                     onClick={handleVoiceInput}
